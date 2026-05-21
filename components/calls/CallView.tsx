@@ -133,7 +133,7 @@ export default function CallView({ callId, type, isCaller, otherName, otherAvata
           const answer = await pc.createAnswer()
           await pc.setLocalDescription(answer)
 
-          ch.send({ type: 'broadcast', event: 'answer', payload: { answer: answer.toJSON() } })
+          ch.send({ type: 'broadcast', event: 'answer', payload: { answer: { type: answer.type, sdp: answer.sdp } } })
         }
       })
     }
