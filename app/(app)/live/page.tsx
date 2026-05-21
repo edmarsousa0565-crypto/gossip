@@ -5,16 +5,9 @@ import { useGSAP } from '@gsap/react'
 import gsap from 'gsap'
 import { createClient } from '@/lib/supabase/client'
 import Avatar from '@/components/ui/Avatar'
-import type { Profile } from '@/lib/supabase/types'
-
-const LIVEKIT_URL = process.env.NEXT_PUBLIC_LIVEKIT_URL ?? ''
 
 export default function LivePage() {
-  const [profile, setProfile] = useState<Profile | null>(null)
   const [streams, setStreams] = useState<any[]>([])
-  const [starting, setStarting] = useState(false)
-  const [title, setTitle] = useState('')
-  const [showStart, setShowStart] = useState(false)
   const router = useRouter()
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -26,12 +19,6 @@ export default function LivePage() {
 
   useEffect(() => {
     const supabase = createClient()
-    supabase.auth.getUser().then(async ({ data }) => {
-      if (!data.user) return
-      const { data: p } = await supabase.from('profiles').select('*').eq('id', data.user.id).single()
-      setProfile(p)
-    })
-
     supabase
       .from('live_streams')
       .select('*, host:profiles(*)')
@@ -40,47 +27,17 @@ export default function LivePage() {
       .then(({ data }) => setStreams(data ?? []))
   }, [])
 
-  function goLive() {
-    router.push('/live/start')
-  }
-
   return (
     <div ref={containerRef} className="max-w-2xl mx-auto px-4 py-6 space-y-5">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold">Ao Vivo</h1>
         <button
-          onClick={() => setShowStart(v => !v)}
+          onClick={() => router.push('/live/start')}
           className="btn-ripple flex items-center gap-2 bg-red-500 hover:bg-red-400 text-white text-sm font-semibold px-4 py-2 rounded-full transition-colors">
           <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
           Transmitir
         </button>
       </div>
-
-      {showStart && (
-        <div className="bg-surface border border-border rounded-2xl p-5 space-y-4">
-          <h2 className="text-sm font-semibold">Iniciar transmissão ao vivo</h2>
-          <input
-            value={title}
-            onChange={e => setTitle(e.target.value)}
-            placeholder="Título (ex: Treino da tarde 💪)"
-            className="w-full bg-surface2 border border-border rounded-xl px-4 py-2.5 text-sm outline-none placeholder:text-muted focus:border-white/30 transition-colors"
-          />
-          {!LIVEKIT_URL && (
-            <p className="text-xs text-orange-400 bg-orange-500/10 border border-orange-500/20 rounded-xl px-4 py-3 leading-relaxed">
-              ⚠️ LiveKit não configurado. Adiciona <span className="font-mono bg-orange-500/20 px-1 rounded">NEXT_PUBLIC_LIVEKIT_URL</span>, <span className="font-mono bg-orange-500/20 px-1 rounded">LIVEKIT_API_KEY</span> e <span className="font-mono bg-orange-500/20 px-1 rounded">LIVEKIT_API_SECRET</span> nas variáveis de ambiente.
-            </p>
-          )}
-          <button
-            onClick={goLive}
-            disabled={starting || !LIVEKIT_URL}
-            className="w-full btn-accent py-3 rounded-xl text-sm font-semibold disabled:opacity-40 flex items-center justify-center gap-2">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-              <polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/>
-            </svg>
-            {starting ? 'A iniciar…' : 'Ir ao vivo'}
-          </button>
-        </div>
-      )}
 
       {streams.length === 0 ? (
         <div className="flex flex-col items-center gap-4 py-16 text-center">
