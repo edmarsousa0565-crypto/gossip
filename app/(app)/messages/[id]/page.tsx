@@ -43,7 +43,7 @@ export default function ConversationPage({ params }: { params: Promise<{ id: str
   const [other, setOther] = useState<Profile | null>(null)
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
-  const [activeCall, setActiveCall] = useState<{ callId: string; roomName: string; token: string; type: 'voice' | 'video' } | null>(null)
+  const [activeCall, setActiveCall] = useState<{ callId: string; type: 'voice' | 'video' } | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editText, setEditText] = useState('')
   const [selectedMsgId, setSelectedMsgId] = useState<string | null>(null)
@@ -139,22 +139,17 @@ export default function ConversationPage({ params }: { params: Promise<{ id: str
   async function startCall(type: 'voice' | 'video') {
     if (!me) return
     const supabase = createClient()
-    const roomName = `call-${me.id}-${otherId}-${Date.now()}`
-    const { data: callRow, error } = await supabase
-      .from('calls').insert({ caller_id: me.id, callee_id: otherId, room_name: roomName, type, status: 'ringing' })
-      .select().single()
-    if (error || !callRow) return
-    const res = await fetch('/api/livekit-token', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ roomName, participantName: me.id, role: 'publisher' }),
+    const callId = crypto.randomUUID()
+    const { error } = await supabase.from('calls').insert({
+      id: callId,
+      caller_id: me.id,
+      callee_id: otherId,
+      room_name: callId,
+      type,
+      status: 'ringing',
     })
-    if (!res.ok) {
-      alert('Chamadas não configuradas. Adiciona NEXT_PUBLIC_LIVEKIT_URL ao Vercel.')
-      await supabase.from('calls').update({ status: 'ended' }).eq('id', callRow.id)
-      return
-    }
-    const { token } = await res.json()
-    setActiveCall({ callId: callRow.id, roomName, token, type })
+    if (error) return
+    setActiveCall({ callId, type })
   }
 
   async function endCall() {
@@ -665,11 +660,11 @@ export default function ConversationPage({ params }: { params: Promise<{ id: str
       {/* ─── Active call overlay ─────────────────────────── */}
       {activeCall && (
         <CallView
-          roomName={activeCall.roomName}
-          token={activeCall.token}
+          callId={activeCall.callId}
           type={activeCall.type}
-          callerName={other?.full_name}
-          callerAvatar={other?.avatar_url}
+          isCaller={true}
+          otherName={other?.full_name}
+          otherAvatar={other?.avatar_url}
           onEnd={endCall}
         />
       )}
