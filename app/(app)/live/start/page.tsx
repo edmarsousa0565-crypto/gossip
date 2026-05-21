@@ -18,6 +18,7 @@ export default function LiveStartPage() {
     setError('')
 
     try {
+      // 1. Cria o stream
       const { data: stream, error: err } = await supabase
         .from('live_streams')
         .insert({
@@ -31,6 +32,10 @@ export default function LiveStartPage() {
         .single()
 
       if (err || !stream) throw new Error(err?.message ?? 'Erro ao criar stream')
+
+      // 2. Notifica seguidores em paralelo (não bloqueia)
+      notifyFollowers(supabase, user.id, stream.id, stream.title).catch(() => {})
+
       router.push(`/live/${stream.id}?role=broadcaster`)
     } catch (e: any) {
       setError(e.message ?? 'Erro ao iniciar o direto.')
@@ -66,7 +71,7 @@ export default function LiveStartPage() {
             onKeyDown={e => { if (e.key === 'Enter' && !starting) goLive() }}
             placeholder="Sobre o que é o teu direto?"
             maxLength={80}
-            className="w-full text-[15px] text-white outline-none"
+            className="w-full text-[15px] text-white outline-none placeholder:text-white/30"
             style={{
               background: '#1c1c1e',
               border: '1px solid rgba(255,255,255,0.12)',
@@ -77,10 +82,21 @@ export default function LiveStartPage() {
         </div>
 
         {error && (
-          <p className="text-[13px] mb-4 px-4 py-3 rounded-xl" style={{ background: 'rgba(255,59,48,0.1)', color: '#ff3b30', border: '1px solid rgba(255,59,48,0.2)' }}>
+          <p className="text-[13px] mb-4 px-4 py-3 rounded-xl"
+            style={{ background: 'rgba(255,59,48,0.1)', color: '#ff3b30', border: '1px solid rgba(255,59,48,0.2)' }}>
             {error}
           </p>
         )}
+
+        {/* Info */}
+        <div className="flex items-center gap-2 mb-5 px-1">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="2" strokeLinecap="round">
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+          <p className="text-[12px]" style={{ color: 'rgba(255,255,255,0.3)' }}>
+            Os teus seguidores serão notificados automaticamente
+          </p>
+        </div>
 
         {/* Go live */}
         <button
@@ -109,5 +125,43 @@ export default function LiveStartPage() {
         </button>
       </div>
     </div>
+  )
+}
+
+async function notifyFollowers(
+  supabase: ReturnType<typeof import('@/lib/supabase/client').createClient>,
+  userId: string,
+  streamId: string,
+  streamTitle: string,
+) {
+  // Busca perfil do broadcaster
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('full_name, username')
+    .eq('id', userId)
+    .single()
+
+  const name = profile?.full_name || profile?.username || 'Alguém'
+
+  // Busca todos os seguidores
+  const { data: followers } = await supabase
+    .from('follows')
+    .select('follower_id')
+    .eq('following_id', userId)
+
+  if (!followers || followers.length === 0) return
+
+  // Insere notificação para cada seguidor (em batch)
+  await supabase.from('notifications').insert(
+    followers.map(f => ({
+      user_id:    f.follower_id,
+      type:       'live_start',
+      actor_id:   userId,
+      ref_id:     streamId,
+      ref_type:   'live_stream',
+      actor_name: name,
+      content:    `${name} começou um direto: "${streamTitle}"`,
+      read:       false,
+    }))
   )
 }
