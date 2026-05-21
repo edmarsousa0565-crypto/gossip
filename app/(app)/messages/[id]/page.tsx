@@ -576,7 +576,7 @@ export default function ConversationPage({ params }: { params: Promise<{ id: str
       </div>
 
       {/* ─── Quick replies ───────────────────────────────── */}
-      {me && <QuickReplies onSend={quickSend} conversationId={otherId} />}
+      {me && <QuickReplies onSend={quickSend} conversationId={otherId} inputValue={input} />}
 
       {/* ─── Input bar ──────────────────────────────────── */}
       <div className="shrink-0 flex items-end gap-2.5 px-3"
